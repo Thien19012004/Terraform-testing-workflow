@@ -16,6 +16,7 @@ concurrency:
 permissions:
   contents: read
   issues: write
+  actions: read   # to download the saved plan artifact from the plan run
 
 env:
   TF_VERSION: "1.5.7"
@@ -56,11 +57,31 @@ jobs:
               body: `✅ Approval received from @${context.actor}. Applying… [View logs](${runUrl})`,
             });
 
+      - name: Resolve plan run id from issue
+        id: planrun
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          RUN_ID=$(printf '%s' "$ISSUE_BODY" | grep -oP '(?<=plan-run-id: )[0-9]+' | head -1)
+          if [[ -z "$RUN_ID" ]]; then
+            echo "::error::Could not find a 'plan-run-id' marker in the issue body; cannot locate the saved plan." >&2
+            exit 1
+          fi
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
 
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Download approved plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          run-id: ${{ steps.planrun.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .
 
       - name: Terraform Init
         run: |
@@ -70,8 +91,10 @@ jobs:
             -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
             -backend-config="key=hub-gec.tfstate"
 
+      # Applies the exact plan that was reviewed. If state drifted since the
+      # plan was created, Terraform refuses the stale plan (safe by design).
       - name: Terraform Apply
-        run: terraform apply -input=false -auto-approve
+        run: terraform apply -input=false tfplan
 
       - name: Report success & close issue
         if: success()

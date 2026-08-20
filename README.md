@@ -57,23 +57,35 @@ Two workflows in `.github/workflows/` run Terraform in CI:
 
 | Workflow | Trigger | Behaviour |
 | --- | --- | --- |
-| `tf-plan-gec.yml` | Push to `main`, PR to `main`, or manual | Runs `terraform plan` and posts the plan as a sticky PR comment. Read-only. |
-| `tf-apply-gec.yml` | Manual (`workflow_dispatch`) | Runs `plan` and opens a GitHub **issue** containing the plan, then stops. |
+| `tf-plan-gec.yml` | PR to `main` | Runs `terraform plan` and posts it as a sticky PR comment (preview only, no issue). |
+| `tf-plan-gec.yml` | Push to `main`, or manual | Runs `terraform plan` and opens an approval **issue** containing the plan. |
 | `tf-apply-run-gec.yml` | Comment on the approval issue | On an authorized `/approve` comment, runs `terraform apply` and closes the issue. `/deny` closes it without applying. |
 
 ### Issue-based approval (ChatOps)
 
-Deployment is gated by a two-step, issue-based approval that uses only
-first-party actions (works under org policies that block third-party actions):
+Deployment is gated by an issue-based approval that uses only first-party
+actions (works under org policies that block third-party actions):
 
-1. Run **Terraform Apply (GEC) — Plan & Request Approval** from the Actions tab.
-   It plans and opens an issue (labelled `tf-apply-approval`) containing the plan.
-2. An authorized reviewer reads the plan and comments **`/approve`** on that
+1. **On a PR to `main`**, the plan runs and is posted as a comment on the PR so
+   you can review before merging. No approval issue is created yet.
+2. **When code lands on `main`** (a merge/push, or a manual run of the plan
+   workflow), the plan runs and opens an issue (labelled `tf-apply-approval`)
+   containing the plan.
+3. An authorized reviewer reads the plan and comments **`/approve`** on that
    issue. That fires **Terraform Apply (GEC) — Apply on Approval**, which applies
    and closes the issue. Commenting **`/deny`** closes it without applying.
 
 Only users with write access (issue-comment `author_association` of `OWNER`,
 `MEMBER`, or `COLLABORATOR`) can approve; comments from anyone else are ignored.
+
+> The apply applies the **exact plan** you reviewed: the plan run uploads the
+> `tfplan` as an artifact, records its run id in the issue, and the apply
+> downloads that artifact and runs `terraform apply tfplan`. If the state drifted
+> since the plan was created, Terraform rejects the stale plan (safe by design) —
+> re-run the plan to produce a fresh approval issue.
+>
+> The approval issue is created from `main` so the reviewed plan and the applied
+> state stay aligned (`issue_comment`-triggered runs always use `main`).
 
 ### Required secrets
 
