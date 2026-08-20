@@ -1,0 +1,19 @@
+# Get your subscription ID with: az account show --query id -o tsv
+# You can also set ARM_SUBSCRIPTION_ID instead of filling this in.
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+location            = "eastus"
+resource_group_name = "rg-terraform-vm"
+vm_name             = "vm-terraform-linux"
+admin_username      = "azureuser"
+
+# Required. Use: ssh-keygen -t ed25519 -f ~/.ssh/azure_vm
+# In CI this is supplied via the ADMIN_SSH_PUBLIC_KEY secret, not this file.
+admin_ssh_public_key = "ssh-ed25519 AAAA... replace-me"
+
+# Required. 6-72 chars, at least 3 of: lowercase, uppercase, digit, special char.
+# In CI this is supplied via the ADMIN_PASSWORD secret, not this file.
+admin_password = "replace-me-Str0ng!Pass"
+
+# Restrict this to your public IP/CIDR, for example "203.0.113.10/32".
+allowed_ssh_source = "0.0.0.0/0"
