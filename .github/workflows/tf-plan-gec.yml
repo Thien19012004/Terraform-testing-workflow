@@ -1,10 +1,12 @@
 name: "Terraform Plan (GEC)"
 
 # Mirrors: prod-pipelines-check-gec.yml (plan only, no apply)
-# Trigger: manually or on PR targeting main
+# Trigger: manually, on PR targeting main, or on push to main
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
