@@ -1,4 +1,4 @@
-name: "03 Hub — Terraform Apply (GEC)"
+name: "Terraform Apply (GEC)"
 
 # Mirrors: prod-pipelines-gec.yml (plan → manual approval → apply)
 # Trigger: manual only (workflow_dispatch)
