@@ -1,0 +1,137 @@
+name: "Terraform Apply (GEC) — Apply on Approval"
+
+# Trigger: a comment on an approval issue opened by tf-apply-gec.yml.
+# Applies only when an authorized reviewer comments "/approve" on an issue
+# labelled "tf-apply-approval". A "/deny" comment closes the issue instead.
+# Uses only first-party actions.
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: terraform-apply-gec
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  TF_VERSION: "1.5.7"
+
+jobs:
+  apply:
+    name: Apply on /approve — LPI-EM-GEC
+    # Only: real issues (not PRs), our approval label, a "/approve" comment,
+    # from a user with write access (owner/member/collaborator).
+    if: >-
+      ${{
+        github.event.issue.pull_request == null &&
+        contains(github.event.issue.labels.*.name, 'tf-apply-approval') &&
+        startsWith(github.event.comment.body, '/approve') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      }}
+    runs-on: ubuntu-latest
+
+    env:
+      ARM_CLIENT_ID:       ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET:   ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID:       ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_admin_ssh_public_key: ${{ secrets.ADMIN_SSH_PUBLIC_KEY }}
+      TF_VAR_admin_password:       ${{ secrets.ADMIN_PASSWORD }}
+
+    steps:
+      - name: Acknowledge approval
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `✅ Approval received from @${context.actor}. Applying… [View logs](${runUrl})`,
+            });
+
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          terraform init -input=false \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
+            -backend-config="key=hub-gec.tfstate"
+
+      - name: Terraform Apply
+        run: terraform apply -input=false -auto-approve
+
+      - name: Report success & close issue
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `✅ Terraform apply succeeded. [View logs](${runUrl})`,
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+            });
+
+      - name: Report failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `❌ Terraform apply failed. [View logs](${runUrl}) — the issue stays open so you can retry.`,
+            });
+
+  deny:
+    name: Close on /deny — LPI-EM-GEC
+    if: >-
+      ${{
+        github.event.issue.pull_request == null &&
+        contains(github.event.issue.labels.*.name, 'tf-apply-approval') &&
+        startsWith(github.event.comment.body, '/deny') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close issue as denied
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🚫 Denied by @${context.actor}. Closing without applying.`,
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+            });

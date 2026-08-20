@@ -58,19 +58,22 @@ Two workflows in `.github/workflows/` run Terraform in CI:
 | Workflow | Trigger | Behaviour |
 | --- | --- | --- |
 | `tf-plan-gec.yml` | Push to `main`, PR to `main`, or manual | Runs `terraform plan` and posts the plan as a sticky PR comment. Read-only. |
-| `tf-apply-gec.yml` | Manual (`workflow_dispatch`) | Runs `plan`, opens an approval issue containing the plan, waits for an `approved` comment, then applies. |
+| `tf-apply-gec.yml` | Manual (`workflow_dispatch`) | Runs `plan` and opens a GitHub **issue** containing the plan, then stops. |
+| `tf-apply-run-gec.yml` | Comment on the approval issue | On an authorized `/approve` comment, runs `terraform apply` and closes the issue. `/deny` closes it without applying. |
 
-The apply pipeline gates the deployment with an **issue-based manual approval**
-(`trstringer/manual-approval`). When you run it, it opens a GitHub issue
-containing the plan and tagging the configured approver(s); the run pauses until
-an approver comments `approved` (commenting `denied` cancels it), then applies.
-Set the allowed approver GitHub username(s) in the workflow's `approvers:` field.
+### Issue-based approval (ChatOps)
 
-> Note: while the run waits for approval it holds a runner (consumes Actions
-> minutes), unlike a GitHub Environment gate which waits for free. To switch to
-> an Environment gate instead, replace the `Wait for approval` step with
-> `environment: <name>` on the job and configure Required Reviewers under
-> Settings → Environments.
+Deployment is gated by a two-step, issue-based approval that uses only
+first-party actions (works under org policies that block third-party actions):
+
+1. Run **Terraform Apply (GEC) — Plan & Request Approval** from the Actions tab.
+   It plans and opens an issue (labelled `tf-apply-approval`) containing the plan.
+2. An authorized reviewer reads the plan and comments **`/approve`** on that
+   issue. That fires **Terraform Apply (GEC) — Apply on Approval**, which applies
+   and closes the issue. Commenting **`/deny`** closes it without applying.
+
+Only users with write access (issue-comment `author_association` of `OWNER`,
+`MEMBER`, or `COLLABORATOR`) can approve; comments from anyone else are ignored.
 
 ### Required secrets
 
