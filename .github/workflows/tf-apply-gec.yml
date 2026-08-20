@@ -45,7 +45,22 @@ jobs:
             -backend-config="key=hub-gec.tfstate"
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan
+        run: |
+          terraform plan -input=false -no-color -out=tfplan
+          terraform show -no-color tfplan | tee plan-to-display.txt
+
+      - name: Publish plan to run summary
+        run: |
+          {
+            echo '### Terraform Plan — Hub (GEC)'
+            echo 'Review this plan, then approve the **Apply** job to deploy.'
+            echo ''
+            echo '```terraform'
+            # Trim to stay under the 1 MiB job-summary limit
+            head -c 900000 plan-to-display.txt
+            echo ''
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4

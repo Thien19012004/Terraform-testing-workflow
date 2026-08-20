@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"C:\\\\Users\\\\thien.d.dinh\\\\OneDrive - Accenture\\\\Desktop\\\\tests\"; $bytes = [System.IO.File]::ReadAllBytes\\(\"README.md\"\\); Write-Host \"Total bytes: $\\($bytes.Length\\)\"; Write-Host \"First 4 bytes: $\\($bytes[0..3] -join ','\\)\"; Write-Host \"Last 40 bytes: $\\($bytes[-40..-1] -join ','\\)\")"
+    ]
+  }
+}
