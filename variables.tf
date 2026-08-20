@@ -54,5 +54,5 @@ variable "allowed_ssh_source" {
 variable "vm_size" {
   description = "Azure VM size."
   type        = string
-  default     = "Standard_B1s"
+  default     = "Standard_B2ats_v2"
 }

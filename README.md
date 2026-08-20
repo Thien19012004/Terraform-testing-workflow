@@ -57,9 +57,16 @@ Two workflows in `.github/workflows/` run Terraform in CI:
 
 | Workflow | Trigger | Behaviour |
 | --- | --- | --- |
+| `tf-plan-gec.yml` | Push to **any** branch | Runs `terraform plan` and publishes it to the run **Summary** page (visibility). |
 | `tf-plan-gec.yml` | PR to `main` | Runs `terraform plan` and posts it as a sticky PR comment (preview only, no issue). |
-| `tf-plan-gec.yml` | Push to `main`, or manual | Runs `terraform plan` and opens an approval **issue** containing the plan. |
-| `tf-apply-run-gec.yml` | Comment on the approval issue | On an authorized `/approve` comment, runs `terraform apply` and closes the issue. `/deny` closes it without applying. |
+| `tf-plan-gec.yml` | Push to `main`, or manual | Runs `terraform plan`, saves the plan artifact, and opens an approval **issue**. |
+| `tf-apply-run-gec.yml` | Comment on the approval issue | On an authorized `/approve` comment, applies the saved plan and closes the issue. `/deny` closes it without applying. |
+
+Plan runs are scoped with a `paths` filter (only `*.tf` / `.terraform.lock.hcl`
+changes) and cache the provider plugins, so non-Terraform commits don't trigger
+runs and each run skips re-downloading providers. A guard job also skips the
+push-triggered plan on a feature branch that already has an open PR, so pushing
+to a PR branch plans once (via the `pull_request` run), not twice.
 
 ### Issue-based approval (ChatOps)
 
