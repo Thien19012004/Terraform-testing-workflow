@@ -57,16 +57,31 @@ Two workflows in `.github/workflows/` run Terraform in CI:
 
 | Workflow | Trigger | Behaviour |
 | --- | --- | --- |
-| `tf-plan-gec.yml` | Push to **any** branch | Runs `terraform plan` and publishes it to the run **Summary** page (visibility). |
-| `tf-plan-gec.yml` | PR to `main` | Runs `terraform plan` and posts it as a sticky PR comment (preview only, no issue). |
-| `tf-plan-gec.yml` | Push to `main`, or manual | Runs `terraform plan`, saves the plan artifact, and opens an approval **issue**. |
+| `tf-plan-gec.yml` | Push to **any** branch | Runs `terraform plan`, publishes it to the run **Summary**, and saves the output as `plan-<sha>`. If the branch has an open PR, updates its sticky comment. |
+| `tf-plan-gec.yml` | PR to `main` (opened/reopened) | **Reuses** the saved plan for the PR's head commit if the code is unchanged (no re-plan); otherwise plans fresh. Posts a sticky PR comment. |
+| `tf-plan-gec.yml` | Push to `main`, or manual | Runs `terraform plan`, saves the `tfplan` artifact, and opens an approval **issue**. |
 | `tf-apply-run-gec.yml` | Comment on the approval issue | On an authorized `/approve` comment, applies the saved plan and closes the issue. `/deny` closes it without applying. |
+
+### Plan reuse (avoid duplicate planning)
+
+The plan workflow identifies "same code" by **commit SHA**:
+
+- Every branch push saves its plan output as an artifact named `plan-<sha>`.
+- When a PR is opened for that same commit, a lightweight `check` job finds the
+  saved `plan-<sha>` and a `reuse` job posts it as the PR comment — **no second
+  `terraform plan`**. If no saved plan is found (e.g. the artifact expired), it
+  falls back to planning fresh.
+- `synchronize` is intentionally not a PR trigger: pushing to a PR branch is
+  handled by the push run (which also updates the PR comment), so the same code
+  is never planned twice.
+
+Reused plans are **previews** — a saved plan reflects the Azure state at push
+time. The plan that actually gets applied is always regenerated fresh at merge to
+`main` (and saved as `tfplan`), so the apply is never based on a reused preview.
 
 Plan runs are scoped with a `paths` filter (only `*.tf` / `.terraform.lock.hcl`
 changes) and cache the provider plugins, so non-Terraform commits don't trigger
-runs and each run skips re-downloading providers. A guard job also skips the
-push-triggered plan on a feature branch that already has an open PR, so pushing
-to a PR branch plans once (via the `pull_request` run), not twice.
+runs and each run skips re-downloading providers.
 
 ### Issue-based approval (ChatOps)
 
