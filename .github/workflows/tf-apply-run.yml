@@ -1,4 +1,4 @@
-name: "Terraform Apply (GEC) — Apply on Approval"
+name: "Terraform Apply — Apply on Approval"
 
 # Trigger: a comment on an approval issue opened by tf-apply-gec.yml.
 # Applies only when an authorized reviewer comments "/approve" on an issue

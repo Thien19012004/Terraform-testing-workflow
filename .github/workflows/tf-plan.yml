@@ -1,4 +1,4 @@
-name: "Terraform Plan (GEC)"
+name: "Terraform Plan"
 
 # Behaviour:
 #   - push to ANY branch        -> plan; save plan output as artifact `plan-<sha>`;
