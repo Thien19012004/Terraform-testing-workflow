@@ -11,9 +11,9 @@ admin_username      = "azureuser"
 # In CI this is supplied via the ADMIN_SSH_PUBLIC_KEY secret, not this file.
 admin_ssh_public_key = "ssh-ed25519 AAAA... replace-me"
 
-# Required. 6-72 chars, at least 3 of: lowercase, uppercase, digit, special char.
-# In CI this is supplied via the ADMIN_PASSWORD secret, not this file.
-admin_password = "replace-me-Str0ng!Pass"
-
 # Restrict this to your public IP/CIDR, for example "203.0.113.10/32".
 allowed_ssh_source = "0.0.0.0/0"
+
+# Your machine's public IP — only this IP can reach the Key Vault.
+# Find yours with: (Invoke-WebRequest https://api.ipify.org).Content
+keyvault_allowed_ip = "170.248.134.67"

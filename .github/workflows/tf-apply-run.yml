@@ -1,4 +1,4 @@
-name: "Terraform Apply (GEC) — Apply on Approval"
+name: "Terraform Apply — Apply on Approval"
 
 # Trigger: a comment on an approval issue opened by tf-apply-gec.yml.
 # Applies only when an authorized reviewer comments "/approve" on an issue
@@ -41,9 +41,24 @@ jobs:
       ARM_TENANT_ID:       ${{ secrets.ARM_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_admin_ssh_public_key: ${{ secrets.ADMIN_SSH_PUBLIC_KEY }}
-      TF_VAR_admin_password:       ${{ secrets.ADMIN_PASSWORD }}
+      TF_VAR_keyvault_allowed_ip:  ${{ vars.KEYVAULT_ALLOWED_IP }}
 
     steps:
+      - name: Whitelist runner IP in Key Vault
+        run: |
+          RUNNER_IP=$(curl -sf https://api.ipify.org)
+          echo "RUNNER_IP=$RUNNER_IP" >> "$GITHUB_ENV"
+          az login --service-principal \
+            -u "$ARM_CLIENT_ID" -p "$ARM_CLIENT_SECRET" \
+            --tenant "$ARM_TENANT_ID" --output none
+          az account set --subscription "$ARM_SUBSCRIPTION_ID"
+          az keyvault network-rule add \
+            --name "${{ vars.KEYVAULT_NAME }}" \
+            --resource-group "${{ vars.KEYVAULT_RESOURCE_GROUP }}" \
+            --ip-address "$RUNNER_IP" \
+            --output none
+          sleep 30
+
       - name: Acknowledge approval
         uses: actions/github-script@v7
         with:
@@ -115,6 +130,17 @@ jobs:
               issue_number: context.issue.number,
               state: 'closed',
             });
+
+      - name: Remove runner IP from Key Vault
+        if: always()
+        run: |
+          [[ -z "$RUNNER_IP" ]] && exit 0
+          az keyvault network-rule remove \
+            --name "${{ vars.KEYVAULT_NAME }}" \
+            --resource-group "${{ vars.KEYVAULT_RESOURCE_GROUP }}" \
+            --ip-address "$RUNNER_IP" \
+            --output none \
+          || true
 
       - name: Report failure
         if: failure()

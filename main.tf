@@ -2,6 +2,8 @@ locals {
   name_prefix = lower(replace(var.vm_name, "_", "-"))
 }
 
+data "azurerm_client_config" "current" {}
+
 resource "azurerm_resource_group" "vm" {
   name     = var.resource_group_name
   location = var.location
@@ -71,7 +73,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   location                        = azurerm_resource_group.vm.location
   size                            = var.vm_size
   admin_username                  = var.admin_username
-  admin_password                  = var.admin_password
+  admin_password                  = random_password.vm_admin.result
   disable_password_authentication = false
 
   network_interface_ids = [azurerm_network_interface.vm.id]
@@ -93,4 +95,49 @@ resource "azurerm_linux_virtual_machine" "vm" {
     version   = "latest"
   }
 }
-######
+
+resource "random_password" "vm_admin" {
+  length           = 24
+  special          = true
+  min_lower        = 1
+  min_upper        = 1
+  min_numeric      = 1
+  min_special      = 1
+}
+
+resource "azurerm_key_vault" "vm" {
+  name                       = "${local.name_prefix}-kv"
+  location                   = azurerm_resource_group.vm.location
+  resource_group_name        = azurerm_resource_group.vm.name
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  sku_name                   = "standard"
+  purge_protection_enabled   = false
+  soft_delete_retention_days = 7
+
+  network_acls {
+    default_action = "Deny"
+    bypass         = "AzureServices"
+    ip_rules       = [var.keyvault_allowed_ip]
+  }
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    key_permissions = [
+      "Get", "List", "Create", "Delete", "Update",
+    ]
+    secret_permissions = [
+      "Get", "List", "Set", "Delete", "Recover",
+    ]
+    certificate_permissions = [
+      "Get", "List",
+    ]
+  }
+}
+
+resource "azurerm_key_vault_secret" "admin_password" {
+  name         = "admin-password"
+  value        = random_password.vm_admin.result
+  key_vault_id = azurerm_key_vault.vm.id
+}

@@ -120,7 +120,6 @@ Settings → Secrets and variables → Actions → **Secrets**:
 | `ARM_TENANT_ID` | Azure AD tenant ID |
 | `ARM_SUBSCRIPTION_ID` | Target subscription ID |
 | `ADMIN_SSH_PUBLIC_KEY` | Contents of your SSH public key (passed as `TF_VAR_admin_ssh_public_key`) |
-| `ADMIN_PASSWORD` | Linux admin password, 6-72 chars with 3 of {lower, upper, digit, special} (passed as `TF_VAR_admin_password`) |
 
 ### Required variables
 
@@ -131,6 +130,9 @@ Same page → **Variables** tab (these are not sensitive):
 | `TFSTATE_RESOURCE_GROUP` | Resource group holding the state storage account |
 | `TFSTATE_STORAGE_ACCOUNT` | Storage account name for remote state |
 | `TFSTATE_CONTAINER` | Blob container name for remote state |
+| `KEYVAULT_ALLOWED_IP` | Your machine's public IP allowed to access the Key Vault (not sensitive — stored as a variable, not a secret) |
+| `KEYVAULT_NAME` | Name of the Key Vault (e.g. `vm-terraform-linux-kv`) — used by workflows to whitelist/delist the runner IP |
+| `KEYVAULT_RESOURCE_GROUP` | Resource group containing the Key Vault (e.g. `rg-terraform-vm`) |
 
 ## Remote state backend
 
