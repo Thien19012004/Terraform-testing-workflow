@@ -158,10 +158,26 @@ jobs:
       ARM_TENANT_ID:       ${{ secrets.ARM_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_admin_ssh_public_key: ${{ secrets.ADMIN_SSH_PUBLIC_KEY }}
-      TF_VAR_admin_password:       ${{ secrets.ADMIN_PASSWORD }}
+      TF_VAR_keyvault_allowed_ip:  ${{ vars.KEYVAULT_ALLOWED_IP }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Whitelist runner IP in Key Vault
+        run: |
+          RUNNER_IP=$(curl -sf https://api.ipify.org)
+          echo "RUNNER_IP=$RUNNER_IP" >> "$GITHUB_ENV"
+          az login --service-principal \
+            -u "$ARM_CLIENT_ID" -p "$ARM_CLIENT_SECRET" \
+            --tenant "$ARM_TENANT_ID" --output none
+          az account set --subscription "$ARM_SUBSCRIPTION_ID"
+          az keyvault network-rule add \
+            --name "${{ vars.KEYVAULT_NAME }}" \
+            --resource-group "${{ vars.KEYVAULT_RESOURCE_GROUP }}" \
+            --ip-address "$RUNNER_IP" \
+            --output none \
+          || echo "::warning::Could not whitelist runner IP — vault may not exist yet (first apply)."
+          sleep 30
 
       - name: Prime plugin cache dir
         run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
@@ -297,3 +313,14 @@ jobs:
               labels: ['tf-apply-approval'],
             });
             core.notice(`Approval issue opened: ${issue.data.html_url}`);
+
+      - name: Remove runner IP from Key Vault
+        if: always()
+        run: |
+          [[ -z "$RUNNER_IP" ]] && exit 0
+          az keyvault network-rule remove \
+            --name "${{ vars.KEYVAULT_NAME }}" \
+            --resource-group "${{ vars.KEYVAULT_RESOURCE_GROUP }}" \
+            --ip-address "$RUNNER_IP" \
+            --output none \
+          || true

@@ -34,17 +34,6 @@ variable "admin_ssh_public_key" {
   sensitive   = true
 }
 
-variable "admin_password" {
-  description = "Password for the Linux administrator. Must be 6-72 chars and contain at least 3 of: lowercase, uppercase, digit, special character."
-  type        = string
-  sensitive   = true
-
-  validation {
-    condition     = length(var.admin_password) >= 6 && length(var.admin_password) <= 72
-    error_message = "admin_password must be between 6 and 72 characters."
-  }
-}
-
 variable "allowed_ssh_source" {
   description = "CIDR allowed to connect over SSH. Replace the default with your public IP/CIDR."
   type        = string
@@ -55,4 +44,9 @@ variable "vm_size" {
   description = "Azure VM size."
   type        = string
   default     = "Standard_B2ats_v2"
+}
+
+variable "keyvault_allowed_ip" {
+  description = "Your machine's public IP address allowed to access the Key Vault (e.g. '203.0.113.10'). Find it with: curl https://api.ipify.org"
+  type        = string
 }
